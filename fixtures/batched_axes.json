@@ -1,0 +1,240 @@
+{
+  "replicas": [
+    "base",
+    "test"
+  ],
+  "examples": [
+    {
+      "id": "a",
+      "tokens": [
+        [
+          1,
+          2
+        ],
+        [
+          3,
+          -1
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "valid": [
+        true,
+        true,
+        true
+      ],
+      "indices": [
+        1,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "b",
+      "tokens": [],
+      "valid": [],
+      "indices": []
+    },
+    {
+      "id": "c",
+      "tokens": [
+        [
+          -1,
+          1
+        ],
+        [
+          99,
+          99
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          3,
+          1
+        ]
+      ],
+      "valid": [
+        true,
+        false,
+        true,
+        true
+      ],
+      "indices": [
+        1,
+        9999,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "d",
+      "tokens": [
+        [
+          1,
+          2
+        ]
+      ],
+      "valid": [
+        true
+      ],
+      "indices": [
+        2
+      ]
+    }
+  ],
+  "tensors": {
+    "shared": {
+      "axes": [
+        "lookup",
+        "feature"
+      ],
+      "values": [
+        [
+          0.25,
+          0.0
+        ],
+        [
+          1.0,
+          -0.5
+        ],
+        [
+          -0.25,
+          1
+        ]
+      ]
+    },
+    "weight": {
+      "axes": [
+        "replica",
+        "feature",
+        "filter"
+      ],
+      "values": [
+        [
+          [
+            1.0,
+            2
+          ],
+          [
+            -1,
+            1
+          ]
+        ],
+        [
+          [
+            0,
+            2
+          ],
+          [
+            1,
+            -1
+          ]
+        ]
+      ]
+    },
+    "posbias": {
+      "axes": [
+        "filter"
+      ],
+      "values": [
+        1,
+        -2
+      ]
+    }
+  },
+  "programs": [
+    {
+      "name": "embed",
+      "op": "gather",
+      "in": [
+        "shared",
+        "indices"
+      ],
+      "axis": "lookup"
+    },
+    {
+      "name": "feature",
+      "op": "add",
+      "in": [
+        "tokens",
+        "embed"
+      ]
+    },
+    {
+      "name": "pre",
+      "op": "matmul",
+      "in": [
+        "feature",
+        "weight"
+      ]
+    },
+    {
+      "name": "act",
+      "op": "plugin",
+      "in": [
+        "pre",
+        "posbias"
+      ],
+      "plugin": "scaled_square"
+    },
+    {
+      "name": "means",
+      "op": "reduce",
+      "in": [
+        "act"
+      ],
+      "axis": -2,
+      "reduce": "mean"
+    },
+    {
+      "name": "scatter",
+      "op": "scatter_add",
+      "in": [
+        "act",
+        "indices"
+      ],
+      "axis": "lookup",
+      "size": 3
+    }
+  ],
+  "requests": [
+    {
+      "layouts": [
+        "replica",
+        "sample"
+      ],
+      "outputs": [
+        "means",
+        "scatter"
+      ],
+      "fallback_budget": 6
+    },
+    {
+      "layouts": [
+        "sample",
+        "replica"
+      ],
+      "outputs": [
+        "means"
+      ],
+      "fallback_budget": 2
+    }
+  ],
+  "stress": {
+    "examples": 144,
+    "short_length": 2,
+    "long_length": 4096,
+    "long_examples": [
+      0,
+      72
+    ],
+    "replicas": 7,
+    "feature": 12,
+    "seed": 16298,
+    "workspace_bytes": 19000000
+  }
+}
